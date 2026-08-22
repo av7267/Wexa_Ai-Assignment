@@ -1,13 +1,26 @@
-from detector.queries import detect_cycles
+from detector.cycles import detect_cycles
 
 
-results = detect_cycles()
+def main():
+    cycles = detect_cycles()
 
-print(f"Cycles found: {len(results)}")
+    print("=" * 60)
+    print("CYCLE DETECTION TEST")
+    print("=" * 60)
 
-for cycle in results:
-    print(
-        f"{cycle['hop_count']}-hop: "
-        f"{' -> '.join(cycle['account_sequence'])}"
-        f" -> {cycle['account_sequence'][0]}"
-    )
+    print(f"Cycles found: {len(cycles)}")
+    print()
+
+    for cycle in cycles:
+        accounts = cycle["account_sequence"]
+        hop_count = cycle["hop_count"]
+
+        print(
+            f"{hop_count}-hop: "
+            + " -> ".join(accounts)
+            + f" -> {accounts[0]}"
+        )
+
+
+if __name__ == "__main__":
+    main()

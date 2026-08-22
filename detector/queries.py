@@ -25,61 +25,122 @@ RETURN count(tx) AS transaction_count
 #
 # Detect directed cycles between 3 and 6 hops.
 #
+# IMPORTANT:
+# We intentionally use separate queries for each cycle length.
+#
+# Do NOT use:
+#
+# MATCH p = (start)-[:TRANSFERRED*3..6]->(start)
+#
+# because that causes a massive variable-length path search.
+#
+# Each query below also requires the starting account to have
+# the smallest ID in the cycle. This removes rotational
+# duplicates.
+#
 # Example:
 #
-# A -> B -> C -> A
+# A004 -> A006 -> A053 -> A004
 #
-# We:
-#
-# 1. Require a directed path.
-# 2. Require 3-6 transfers.
-# 3. Require all intermediate accounts to be different.
-# 4. Use the smallest account ID as the starting point.
-#
-# This prevents the same cycle from being returned once for every
-# possible starting account.
-#
+# will be returned once, rather than once from A004, A006,
+# and A053.
 # ============================================================
 
-CYCLE_DETECTION_QUERY = """
-MATCH p = (start:Account)-[:TRANSFERRED*3..6]->(start)
 
-WITH
-    [node IN nodes(p) | node.id] AS accounts,
-    length(p) AS hop_count
+CYCLE_DETECTION_QUERY = """
+
+// ============================================================
+// 3-HOP CYCLES
+// ============================================================
+
+MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
+      -[:TRANSFERRED]->(c:Account)
+      -[:TRANSFERRED]->(a)
 
 WHERE
-    ALL(
-        i IN range(0, size(accounts) - 2)
-        WHERE NOT accounts[i] IN accounts[i + 1..]
-    )
+    a.id < b.id
+    AND a.id < c.id
 
-    AND start.id = reduce(
-        smallest = start.id,
-        account_id IN accounts |
-        CASE
-            WHEN account_id < smallest THEN account_id
-            ELSE smallest
-        END
-    )
+RETURN
+    [a.id, b.id, c.id] AS account_sequence,
+    3 AS hop_count
 
-RETURN DISTINCT
-    accounts AS account_sequence,
-    hop_count
 
-ORDER BY hop_count, account_sequence
+UNION
+
+
+// ============================================================
+// 4-HOP CYCLES
+// ============================================================
+
+MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
+      -[:TRANSFERRED]->(c:Account)
+      -[:TRANSFERRED]->(d:Account)
+      -[:TRANSFERRED]->(a)
+
+WHERE
+    a.id < b.id
+    AND a.id < c.id
+    AND a.id < d.id
+
+RETURN
+    [a.id, b.id, c.id, d.id] AS account_sequence,
+    4 AS hop_count
+
+
+UNION
+
+
+// ============================================================
+// 5-HOP CYCLES
+// ============================================================
+
+MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
+      -[:TRANSFERRED]->(c:Account)
+      -[:TRANSFERRED]->(d:Account)
+      -[:TRANSFERRED]->(e:Account)
+      -[:TRANSFERRED]->(a)
+
+WHERE
+    a.id < b.id
+    AND a.id < c.id
+    AND a.id < d.id
+    AND a.id < e.id
+
+RETURN
+    [a.id, b.id, c.id, d.id, e.id] AS account_sequence,
+    5 AS hop_count
+
+
+UNION
+
+
+// ============================================================
+// 6-HOP CYCLES
+// ============================================================
+
+MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
+      -[:TRANSFERRED]->(c:Account)
+      -[:TRANSFERRED]->(d:Account)
+      -[:TRANSFERRED]->(e:Account)
+      -[:TRANSFERRED]->(f:Account)
+      -[:TRANSFERRED]->(a)
+
+WHERE
+    a.id < b.id
+    AND a.id < c.id
+    AND a.id < d.id
+    AND a.id < e.id
+    AND a.id < f.id
+
+RETURN
+    [a.id, b.id, c.id, d.id, e.id, f.id] AS account_sequence,
+    6 AS hop_count
 """
 
 
 # ============================================================
 # THREE-HOP CYCLE DETECTION
-# ============================================================
-#
-# Dedicated query for short cycles.
-#
-# 3-hop cycles are generally stronger signals than long random
-# graph cycles, so we keep this query separately available.
-#
 # ============================================================
 
 THREE_HOP_CYCLE_QUERY = """
@@ -87,8 +148,9 @@ MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
       -[:TRANSFERRED]->(c:Account)
       -[:TRANSFERRED]->(a)
 
-WHERE a.id < b.id
-  AND a.id < c.id
+WHERE
+    a.id < b.id
+    AND a.id < c.id
 
 RETURN DISTINCT
     [a.id, b.id, c.id] AS account_sequence,
@@ -100,21 +162,6 @@ ORDER BY account_sequence
 
 # ============================================================
 # FAN-OUT DETECTION
-# ============================================================
-#
-# Retrieve outgoing transfers for accounts that have multiple
-# recipients.
-#
-# IMPORTANT:
-#
-# High number of recipients alone is NOT considered fraud.
-#
-# The Python detector will examine the timestamps and determine
-# whether the transactions are clustered in a short time window.
-#
-# This is necessary because the seed contains a legitimate
-# payroll account with many recipients spread over 180 days.
-#
 # ============================================================
 
 FANOUT_QUERY = """
@@ -135,20 +182,6 @@ ORDER BY source.id, tx.timestamp
 # ============================================================
 # CONVERGENCE DETECTION
 # ============================================================
-#
-# Find accounts receiving transfers from multiple different
-# accounts.
-#
-# Example:
-#
-# A ----\
-# B -----+--> X
-# C ----/
-#
-# We retrieve the raw transactions and let Python perform the
-# structural/time-window analysis.
-#
-# ============================================================
 
 CONVERGENCE_QUERY = """
 MATCH (source:Account)-[tx:TRANSFERRED]->(collector:Account)
@@ -167,18 +200,6 @@ ORDER BY collector.id, tx.timestamp
 
 # ============================================================
 # FAN-OUT + CONVERGENCE
-# ============================================================
-#
-# Detect the structure:
-#
-#              source
-#             /  |  \
-#            A   B   C
-#             \  |  /
-#              collector
-#
-# This is stronger than either fan-out or convergence by itself.
-#
 # ============================================================
 
 FANOUT_CONVERGENCE_QUERY = """
@@ -201,10 +222,6 @@ ORDER BY source_account, collector_account
 # ============================================================
 # ACCOUNT TRANSACTION HISTORY
 # ============================================================
-#
-# Useful later for risk scoring.
-#
-# ============================================================
 
 ACCOUNT_TRANSACTION_HISTORY_QUERY = """
 MATCH (a:Account)-[tx:TRANSFERRED]->(b:Account)
@@ -221,12 +238,15 @@ ORDER BY tx.timestamp
 
 
 # ============================================================
-# DETECT CYCLES
+# EXECUTE CYCLE DETECTION
 # ============================================================
 
 def detect_cycles():
     """
     Execute the cycle detection query.
+
+    Returns:
+        list[dict]
     """
 
     from detector.db import run_query

@@ -19,12 +19,10 @@ def detect_cycles():
     cycles = []
 
     for row in results:
-        sequence = row["account_sequence"]
-
         cycles.append(
             {
-                "length": row["cycle_length"],
-                "accounts": sequence,
+                "hop_count": row["hop_count"],
+                "account_sequence": row["account_sequence"],
             }
         )
 
@@ -45,10 +43,10 @@ def print_cycles(cycles):
     print("=" * 60)
 
     for cycle in cycles:
-        accounts = cycle["accounts"]
+        accounts = cycle["account_sequence"]
 
         print(
-            f"{cycle['length']}-hop: "
+            f"{cycle['hop_count']}-hop: "
             + " -> ".join(accounts)
             + f" -> {accounts[0]}"
         )
