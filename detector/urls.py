@@ -1,10 +1,38 @@
 from django.urls import path
 
-from detector import views
+from detector.views import (
+    health,
+    account_list,
+    account_detail,
+    account_transactions,
+    detection_cycles,
+    detection_fanout,
+)
 
 
 urlpatterns = [
-    path("health", views.health, name="health"),
-    path("detections/cycles", views.cycles, name="cycles"),
-    path("detections/fanout", views.fanout, name="fanout"),
+    path("health", health, name="health"),
+
+    path("accounts", account_list, name="account-list"),
+    path(
+        "accounts/<str:account_id>",
+        account_detail,
+        name="account-detail",
+    ),
+    path(
+        "accounts/<str:account_id>/transactions",
+        account_transactions,
+        name="account-transactions",
+    ),
+
+    path(
+        "detections/cycles",
+        detection_cycles,
+        name="detection-cycles",
+    ),
+    path(
+        "detections/fanout",
+        detection_fanout,
+        name="detection-fanout",
+    ),
 ]

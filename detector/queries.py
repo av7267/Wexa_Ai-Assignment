@@ -189,3 +189,53 @@ RETURN
 
 ORDER BY tx.timestamp
 """
+
+
+# ============================================================
+# ACCOUNT QUERIES
+# ============================================================
+
+ACCOUNT_LIST_QUERY = """
+MATCH (a:Account)
+RETURN
+    a.id AS id,
+    a.name AS name,
+    a.account_type AS account_type,
+    a.created_at AS created_at
+ORDER BY a.id
+"""
+
+
+ACCOUNT_DETAIL_QUERY = """
+MATCH (a:Account {id: $account_id})
+RETURN
+    a.id AS id,
+    a.name AS name,
+    a.account_type AS account_type,
+    a.created_at AS created_at
+"""
+
+
+ACCOUNT_NEIGHBORHOOD_QUERY = """
+MATCH (a:Account {id: $account_id})
+
+OPTIONAL MATCH (a)-[out:TRANSFERRED]->(to:Account)
+OPTIONAL MATCH (from:Account)-[inc:TRANSFERRED]->(a)
+
+RETURN
+    collect(DISTINCT {
+        account_id: to.id,
+        account_name: to.name,
+        transaction_id: out.transaction_id,
+        amount: out.amount,
+        timestamp: out.timestamp
+    }) AS outgoing,
+
+    collect(DISTINCT {
+        account_id: from.id,
+        account_name: from.name,
+        transaction_id: inc.transaction_id,
+        amount: inc.amount,
+        timestamp: inc.timestamp
+    }) AS incoming
+"""
