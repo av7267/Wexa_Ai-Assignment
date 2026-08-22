@@ -23,34 +23,29 @@ RETURN count(tx) AS transaction_count
 # CYCLE DETECTION
 # ============================================================
 #
-# Detect directed cycles between 3 and 6 hops.
+# Detect SIMPLE directed cycles from 3 to 6 hops.
 #
-# IMPORTANT:
-# We intentionally use separate queries for each cycle length.
+# A simple cycle means:
 #
-# Do NOT use:
+# A -> B -> C -> A
 #
-# MATCH p = (start)-[:TRANSFERRED*3..6]->(start)
+# is valid.
 #
-# because that causes a massive variable-length path search.
+# But:
 #
-# Each query below also requires the starting account to have
-# the smallest ID in the cycle. This removes rotational
-# duplicates.
+# A -> B -> C -> B -> A
 #
-# Example:
+# is NOT valid because B appears twice.
 #
-# A004 -> A006 -> A053 -> A004
+# We also force "a" to have the smallest account ID.
+# This removes rotational duplicates.
 #
-# will be returned once, rather than once from A004, A006,
-# and A053.
 # ============================================================
-
 
 CYCLE_DETECTION_QUERY = """
 
 // ============================================================
-// 3-HOP CYCLES
+// 3-HOP
 // ============================================================
 
 MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
@@ -58,7 +53,10 @@ MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
       -[:TRANSFERRED]->(a)
 
 WHERE
-    a.id < b.id
+    a <> b
+    AND a <> c
+    AND b <> c
+    AND a.id < b.id
     AND a.id < c.id
 
 RETURN
@@ -70,7 +68,7 @@ UNION
 
 
 // ============================================================
-// 4-HOP CYCLES
+// 4-HOP
 // ============================================================
 
 MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
@@ -79,7 +77,14 @@ MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
       -[:TRANSFERRED]->(a)
 
 WHERE
-    a.id < b.id
+    a <> b
+    AND a <> c
+    AND a <> d
+    AND b <> c
+    AND b <> d
+    AND c <> d
+
+    AND a.id < b.id
     AND a.id < c.id
     AND a.id < d.id
 
@@ -92,7 +97,7 @@ UNION
 
 
 // ============================================================
-// 5-HOP CYCLES
+// 5-HOP
 // ============================================================
 
 MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
@@ -102,7 +107,21 @@ MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
       -[:TRANSFERRED]->(a)
 
 WHERE
-    a.id < b.id
+    a <> b
+    AND a <> c
+    AND a <> d
+    AND a <> e
+
+    AND b <> c
+    AND b <> d
+    AND b <> e
+
+    AND c <> d
+    AND c <> e
+
+    AND d <> e
+
+    AND a.id < b.id
     AND a.id < c.id
     AND a.id < d.id
     AND a.id < e.id
@@ -116,7 +135,7 @@ UNION
 
 
 // ============================================================
-// 6-HOP CYCLES
+// 6-HOP
 // ============================================================
 
 MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
@@ -127,7 +146,27 @@ MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
       -[:TRANSFERRED]->(a)
 
 WHERE
-    a.id < b.id
+    a <> b
+    AND a <> c
+    AND a <> d
+    AND a <> e
+    AND a <> f
+
+    AND b <> c
+    AND b <> d
+    AND b <> e
+    AND b <> f
+
+    AND c <> d
+    AND c <> e
+    AND c <> f
+
+    AND d <> e
+    AND d <> f
+
+    AND e <> f
+
+    AND a.id < b.id
     AND a.id < c.id
     AND a.id < d.id
     AND a.id < e.id
@@ -149,7 +188,10 @@ MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
       -[:TRANSFERRED]->(a)
 
 WHERE
-    a.id < b.id
+    a <> b
+    AND a <> c
+    AND b <> c
+    AND a.id < b.id
     AND a.id < c.id
 
 RETURN DISTINCT
@@ -161,7 +203,7 @@ ORDER BY account_sequence
 
 
 # ============================================================
-# FAN-OUT DETECTION
+# FAN-OUT
 # ============================================================
 
 FANOUT_QUERY = """
@@ -180,7 +222,7 @@ ORDER BY source.id, tx.timestamp
 
 
 # ============================================================
-# CONVERGENCE DETECTION
+# CONVERGENCE
 # ============================================================
 
 CONVERGENCE_QUERY = """
@@ -244,9 +286,6 @@ ORDER BY tx.timestamp
 def detect_cycles():
     """
     Execute the cycle detection query.
-
-    Returns:
-        list[dict]
     """
 
     from detector.db import run_query
