@@ -157,17 +157,17 @@ ORDER BY collector.id, tx.timestamp
 # ============================================================
 
 FANOUT_CONVERGENCE_QUERY = """
-MATCH (source:Account)-[:TRANSFERRED]->(recipient:Account)
-      -[:TRANSFERRED]->(collector:Account)
+MATCH (source:Account)-[tx1:TRANSFERRED]->(recipient:Account)
+      -[tx2:TRANSFERRED]->(collector:Account)
 
 WHERE source <> collector
 
 RETURN DISTINCT
     source.id AS source_account,
-    source.name AS source_name,
     collector.id AS collector_account,
-    collector.name AS collector_name,
-    recipient.id AS recipient_account
+    recipient.id AS recipient_account,
+    tx1.timestamp AS first_hop_timestamp,
+    tx2.timestamp AS second_hop_timestamp
 
 ORDER BY source_account, collector_account
 """
