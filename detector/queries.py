@@ -23,160 +23,72 @@ RETURN count(tx) AS transaction_count
 # CYCLE DETECTION
 # ============================================================
 #
-# Detect SIMPLE directed cycles from 3 to 6 hops.
+# Detect simple directed cycles from 3 to 6 hops.
 #
-# A simple cycle means:
+# Example:
 #
 # A -> B -> C -> A
 #
-# is valid.
-#
-# But:
+# Valid.
 #
 # A -> B -> C -> B -> A
 #
-# is NOT valid because B appears twice.
+# Invalid because B appears twice.
 #
-# We also force "a" to have the smallest account ID.
-# This removes rotational duplicates.
+# The query:
+#
+# 1. Finds directed paths of 3-6 transfers.
+# 2. Ensures the starting account is the smallest ID.
+# 3. Ensures every account in the cycle is unique.
+# 4. Returns one canonical representation of each cycle.
 #
 # ============================================================
-
 CYCLE_DETECTION_QUERY = """
+MATCH p = (start:Account)-[:TRANSFERRED*3..6]->(start)
 
-// ============================================================
-// 3-HOP
-// ============================================================
-
-MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
-      -[:TRANSFERRED]->(c:Account)
-      -[:TRANSFERRED]->(a)
+WITH
+    start,
+    nodes(p)[0..-1] AS cycle_nodes,
+    length(p) AS hop_count
 
 WHERE
-    a <> b
-    AND a <> c
-    AND b <> c
-    AND a.id < b.id
-    AND a.id < c.id
+    // Only 3-6 hop cycles.
+    hop_count >= 3
+    AND hop_count <= 6
 
-RETURN
-    [a.id, b.id, c.id] AS account_sequence,
-    3 AS hop_count
+    // Canonical cycle:
+    // smallest account ID must be the starting account.
+    AND start.id = reduce(
+        smallest = start.id,
+        node IN cycle_nodes |
+        CASE
+            WHEN node.id < smallest
+            THEN node.id
+            ELSE smallest
+        END
+    )
 
+UNWIND cycle_nodes AS node
 
-UNION
+WITH
+    start,
+    cycle_nodes,
+    hop_count,
+    collect(DISTINCT node.id) AS distinct_ids
 
+// Reject cycles where an account occurs more than once.
+WHERE size(cycle_nodes) = size(distinct_ids)
 
-// ============================================================
-// 4-HOP
-// ============================================================
+WITH
+    [node IN cycle_nodes | node.id] AS account_sequence,
+    hop_count
 
-MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
-      -[:TRANSFERRED]->(c:Account)
-      -[:TRANSFERRED]->(d:Account)
-      -[:TRANSFERRED]->(a)
+RETURN DISTINCT
+    account_sequence,
+    hop_count
 
-WHERE
-    a <> b
-    AND a <> c
-    AND a <> d
-    AND b <> c
-    AND b <> d
-    AND c <> d
-
-    AND a.id < b.id
-    AND a.id < c.id
-    AND a.id < d.id
-
-RETURN
-    [a.id, b.id, c.id, d.id] AS account_sequence,
-    4 AS hop_count
-
-
-UNION
-
-
-// ============================================================
-// 5-HOP
-// ============================================================
-
-MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
-      -[:TRANSFERRED]->(c:Account)
-      -[:TRANSFERRED]->(d:Account)
-      -[:TRANSFERRED]->(e:Account)
-      -[:TRANSFERRED]->(a)
-
-WHERE
-    a <> b
-    AND a <> c
-    AND a <> d
-    AND a <> e
-
-    AND b <> c
-    AND b <> d
-    AND b <> e
-
-    AND c <> d
-    AND c <> e
-
-    AND d <> e
-
-    AND a.id < b.id
-    AND a.id < c.id
-    AND a.id < d.id
-    AND a.id < e.id
-
-RETURN
-    [a.id, b.id, c.id, d.id, e.id] AS account_sequence,
-    5 AS hop_count
-
-
-UNION
-
-
-// ============================================================
-// 6-HOP
-// ============================================================
-
-MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
-      -[:TRANSFERRED]->(c:Account)
-      -[:TRANSFERRED]->(d:Account)
-      -[:TRANSFERRED]->(e:Account)
-      -[:TRANSFERRED]->(f:Account)
-      -[:TRANSFERRED]->(a)
-
-WHERE
-    a <> b
-    AND a <> c
-    AND a <> d
-    AND a <> e
-    AND a <> f
-
-    AND b <> c
-    AND b <> d
-    AND b <> e
-    AND b <> f
-
-    AND c <> d
-    AND c <> e
-    AND c <> f
-
-    AND d <> e
-    AND d <> f
-
-    AND e <> f
-
-    AND a.id < b.id
-    AND a.id < c.id
-    AND a.id < d.id
-    AND a.id < e.id
-    AND a.id < f.id
-
-RETURN
-    [a.id, b.id, c.id, d.id, e.id, f.id] AS account_sequence,
-    6 AS hop_count
+ORDER BY hop_count, account_sequence
 """
-
 
 # ============================================================
 # THREE-HOP CYCLE DETECTION
@@ -203,7 +115,7 @@ ORDER BY account_sequence
 
 
 # ============================================================
-# FAN-OUT
+# FAN-OUT DETECTION
 # ============================================================
 
 FANOUT_QUERY = """
@@ -222,7 +134,7 @@ ORDER BY source.id, tx.timestamp
 
 
 # ============================================================
-# CONVERGENCE
+# CONVERGENCE DETECTION
 # ============================================================
 
 CONVERGENCE_QUERY = """
@@ -277,17 +189,3 @@ RETURN
 
 ORDER BY tx.timestamp
 """
-
-
-# ============================================================
-# EXECUTE CYCLE DETECTION
-# ============================================================
-
-def detect_cycles():
-    """
-    Execute the cycle detection query.
-    """
-
-    from detector.db import run_query
-
-    return run_query(CYCLE_DETECTION_QUERY)

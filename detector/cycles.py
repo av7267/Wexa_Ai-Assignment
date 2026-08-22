@@ -8,7 +8,7 @@ from detector.queries import CYCLE_DETECTION_QUERY
 
 def detect_cycles():
     """
-    Detect simple directed transaction cycles from 3 to 6 hops.
+    Detect directed simple transaction cycles from 3 to 6 hops.
 
     Returns:
         list[dict]
@@ -21,8 +21,8 @@ def detect_cycles():
     for row in results:
         cycles.append(
             {
-                "account_sequence": row["account_sequence"],
                 "hop_count": row["hop_count"],
+                "account_sequence": row["account_sequence"],
             }
         )
 
@@ -47,8 +47,7 @@ def print_cycles(cycles):
 
         print(
             f"{cycle['hop_count']}-hop: "
-            + " -> ".join(accounts)
-            + f" -> {accounts[0]}"
+            f"{' -> '.join(accounts)} -> {accounts[0]}"
         )
 
     print()

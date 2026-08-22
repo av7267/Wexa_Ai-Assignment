@@ -1,24 +1,44 @@
-import os
-from dotenv import load_dotenv
-from neo4j import GraphDatabase
+from detector.db import verify_connection, run_query, close_driver
 
-load_dotenv()
 
-URI = os.getenv("COGNODB_URI")
-USERNAME = os.getenv("COGNODB_USERNAME")
-PASSWORD = os.getenv("COGNODB_PASSWORD")
+def main():
 
-driver = GraphDatabase.driver(
-    URI,
-    auth=(USERNAME, PASSWORD),
-)
+    print("=" * 60)
+    print("NEO4J CONNECTION TEST")
+    print("=" * 60)
 
-try:
-    with driver.session() as session:
-        result = session.run("RETURN 1 AS test")
-        record = result.single()
+    try:
 
-        print("Got:", record["test"])
+        # Test authentication/connectivity
+        verify_connection()
 
-finally:
-    driver.close()
+        # Test Cypher query
+        query = """
+        RETURN
+            1 AS test,
+            "Neo4j connection works" AS message
+        """
+
+        results = run_query(query)
+
+        print()
+        print("Query result:")
+        print(results)
+
+        print()
+        print("SUCCESS")
+
+    except Exception as e:
+
+        print()
+        print("CONNECTION FAILED")
+        print(type(e).__name__)
+        print(e)
+
+    finally:
+
+        close_driver()
+
+
+if __name__ == "__main__":
+    main()
