@@ -197,14 +197,25 @@ ORDER BY tx.timestamp
 
 ACCOUNT_LIST_QUERY = """
 MATCH (a:Account)
+
+OPTIONAL MATCH (a)-[out:TRANSFERRED]->()
+WITH a, count(out) AS outgoing_count
+
+OPTIONAL MATCH ()-[inc:TRANSFERRED]->(a)
+WITH
+    a,
+    outgoing_count,
+    count(inc) AS incoming_count
+
 RETURN
     a.id AS id,
     a.name AS name,
     a.account_type AS account_type,
-    a.created_at AS created_at
+    a.created_at AS created_at,
+    outgoing_count + incoming_count AS transaction_count
+
 ORDER BY a.id
 """
-
 
 ACCOUNT_DETAIL_QUERY = """
 MATCH (a:Account {id: $account_id})

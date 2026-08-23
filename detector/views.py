@@ -1,15 +1,19 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from detector.convergence import detect_convergence
 
 from detector.db import run_query
+
 from detector.queries import (
+    ACCOUNT_COUNT_QUERY,
+    TRANSACTION_COUNT_QUERY,
     ACCOUNT_LIST_QUERY,
     ACCOUNT_DETAIL_QUERY,
     ACCOUNT_NEIGHBORHOOD_QUERY,
 )
+
 from detector.cycles import detect_cycles
 from detector.fanout import detect_fanout
+from detector.convergence import detect_convergence
 
 
 def _serialize_account(row):
@@ -127,6 +131,15 @@ def account_transactions(request, account_id):
             status=503,
         )
 
+    if not rows:
+        return Response({
+            "account": {
+                "id": account_id,
+            },
+            "outgoing": [],
+            "incoming": [],
+        })
+
     row = rows[0]
 
     outgoing = [
@@ -147,6 +160,27 @@ def account_transactions(request, account_id):
         },
         "outgoing": outgoing,
         "incoming": incoming,
+    })
+
+
+@api_view(["GET"])
+def transaction_count(request):
+    try:
+        rows = run_query(TRANSACTION_COUNT_QUERY)
+
+    except Exception:
+        return Response(
+            {"error": "database unavailable"},
+            status=503,
+        )
+
+    count = 0
+
+    if rows:
+        count = rows[0].get("transaction_count", 0)
+
+    return Response({
+        "transaction_count": count,
     })
 
 
