@@ -764,5 +764,4 @@ The backend and graph-analysis components have been implemented and verified aga
 
 ## Author
 
-**Arnav**
-Computer Science Student
+**Arnav Chennavaram**
