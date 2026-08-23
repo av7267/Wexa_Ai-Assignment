@@ -408,7 +408,7 @@ transaction-graph/
 | Database protocol | Bolt |
 | Database driver | Official Neo4j Python Driver |
 | Query language | Cypher |
-| Deployment | Render + CognoDB |
+| Run environment | Local (Django development server) + CognoDB |
 
 ---
 
@@ -435,7 +435,7 @@ The application uses the Neo4j-compatible Bolt interface exposed by CognoDB.
 ### 2. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone <https://github.com/av7267/Wexa_Ai-Assignment>
 cd transaction-graph
 ```
 
@@ -577,15 +577,15 @@ docs/
 
 ---
 
-## Hosted Demo
+## Demo
 
-**Live Application:** `<ADD RENDER DEPLOYMENT URL>`
+The application runs locally rather than as a hosted deployment. A screen recording demonstrates the full working application end-to-end:
 
-**Screen Recording:** `<ADD SCREEN RECORDING URL>`
+**Screen Recording:** [View the screen recording](https://drive.google.com/file/d/1nhkt5UE9vTgqWKktab70k1wa3mykfQge/view?usp=sharing)
 
-A short screen recording demonstrates:
+The recording covers:
 
-1. Opening the application
+1. Opening the application locally
 2. Searching/selecting an account
 3. Viewing its transaction graph
 4. Running/viewing suspicious-pattern detection
@@ -594,18 +594,17 @@ A short screen recording demonstrates:
 
 ---
 
-## Deployment
+## Running the Application Locally
 
-The application is hosted on Render with CognoDB providing the graph database.
+The application is designed to run on a local machine, with CognoDB providing the graph database over the Bolt protocol.
 
 ```
-                       Internet
+                    Local Machine
                            │
                            ▼
                     ┌─────────────┐
-                    │    Render   │
-                    │             │
-                    │ Django/DRF  │
+                    │  Django/DRF │
+                    │ (runserver) │
                     └──────┬──────┘
                            │
                            │ Neo4j Driver
@@ -618,7 +617,7 @@ The application is hosted on Render with CognoDB providing the graph database.
                     └─────────────┘
 ```
 
-Environment variables containing database credentials are configured through the hosting platform rather than committed to the repository.
+Environment variables containing database credentials are configured through the local `.env` file (see Setup) and are never committed to the repository.
 
 ---
 
@@ -703,7 +702,7 @@ The suspicious signal can exist in the relationship structure even when individu
 | Loading state | Detection query loading state |
 | Empty state | No suspicious patterns |
 | Error state | CognoDB/backend unavailable |
-| Hosted demo | Render |
+| Demo | Local run + screen recording |
 | Database | CognoDB |
 | README diagram | Account/transaction graph |
 | Screen recording | Suspicious transaction-ring demonstration |
@@ -732,14 +731,12 @@ The backend and graph-analysis components have been implemented and verified aga
 **Remaining submission artifacts to finalize before submission:**
 
 - Final screenshots
-- Render hosted URL
 - Screen recording URL
 - Exact final seed-data counts
 - Repository URL
-- Any deployment-specific setup commands
+- Any local environment-specific setup commands
 
 ---
-
 
 ### CognoDB Running Instance
 
