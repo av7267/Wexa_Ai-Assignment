@@ -51,7 +51,9 @@ The detection logic does not rely on a list of pre-planted suspicious accounts. 
 
 ## Why a Graph Database?
 
-The suspicious behavior in this application is defined primarily by transaction topology, rather than by individual transaction attributes.
+The suspicious behavior in this application is defined by transaction **topology** rather than by individual transaction attributes. Detecting a 4–6 hop circular flow requires traversing a variable-length path and checking whether it returns to the originating account. Similarly, identifying fan-out/convergence requires following relationships across multiple accounts.
+
+These patterns are naturally represented and queried as graph traversals, whereas a relational implementation would require recursive CTEs or multiple self-joins whose complexity increases with traversal depth.
 
 A relational schema could store the same accounts and transactions:
 
