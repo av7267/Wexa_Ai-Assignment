@@ -1,48 +1,145 @@
 // ============================================================
-// Config
+// CONFIGURATION
 // ============================================================
 
 const API_BASE = "http://127.0.0.1:8000/api";
+
+const REQUEST_TIMEOUT = 10000;
 
 const state = {
   accounts: [],
   cycles: [],
   fanouts: [],
   convergence: [],
+
+  activeAccountId: null,
+
+  loading: {
+    accounts: false,
+    transactions: false,
+    cycles: false,
+    fanout: false,
+  },
 };
 
+
 // ============================================================
-// Small helpers
+// DOM HELPERS
 // ============================================================
 
 function $(id) {
   return document.getElementById(id);
 }
 
+
+// ============================================================
+// API
+// ============================================================
+
 async function apiGet(path) {
-  const res = await fetch(`${API_BASE}${path}`);
 
-  if (!res.ok) {
-    const err = new Error(`${res.status} ${res.statusText}`);
-    err.status = res.status;
-    throw err;
+  const controller = new AbortController();
+
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, REQUEST_TIMEOUT);
+
+  try {
+
+    const response = await fetch(
+      `${API_BASE}${path}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        signal: controller.signal,
+      }
+    );
+
+    if (!response.ok) {
+
+      let message = `${response.status} ${response.statusText}`;
+
+      try {
+        const errorBody = await response.json();
+
+        if (errorBody?.detail) {
+          message = errorBody.detail;
+        }
+
+        if (errorBody?.message) {
+          message = errorBody.message;
+        }
+
+      } catch {
+        // Keep HTTP status message.
+      }
+
+      const error = new Error(message);
+
+      error.status = response.status;
+
+      throw error;
+    }
+
+    return await response.json();
+
+  } catch (error) {
+
+    if (error.name === "AbortError") {
+      throw new Error(
+        "The backend request timed out."
+      );
+    }
+
+    if (
+      error instanceof TypeError
+    ) {
+      throw new Error(
+        "Unable to connect to the backend."
+      );
+    }
+
+    throw error;
+
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return res.json();
 }
 
-function asList(payload) {
-  if (Array.isArray(payload)) return payload;
 
-  if (payload && Array.isArray(payload.results)) {
+// ============================================================
+// GENERAL HELPERS
+// ============================================================
+
+function asList(payload) {
+
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (
+    payload &&
+    Array.isArray(payload.results)
+  ) {
     return payload.results;
+  }
+
+  if (
+    payload &&
+    Array.isArray(payload.items)
+  ) {
+    return payload.items;
   }
 
   return [];
 }
 
-function escapeHtml(str) {
-  return String(str ?? "")
+
+function escapeHtml(value) {
+
+  return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -50,293 +147,474 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
+
 function formatAmount(amount) {
+
   if (
     amount === undefined ||
     amount === null ||
     amount === ""
   ) {
-    return "";
+    return "—";
   }
 
-  const n = Number(amount);
+  const number = Number(amount);
 
-  if (Number.isNaN(n)) {
+  if (Number.isNaN(number)) {
     return String(amount);
   }
 
-  return "₹" + n.toLocaleString("en-IN");
+  return `₹${number.toLocaleString("en-IN")}`;
 }
 
-function formatDate(dateValue) {
-  if (!dateValue) return "";
 
-  const date = new Date(dateValue);
+function formatDate(value) {
 
-  if (Number.isNaN(date.getTime())) {
-    return String(dateValue);
+  if (!value) {
+    return "";
   }
 
-  return date.toLocaleString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleString(
+    "en-IN",
+    {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }
+  );
 }
 
-function stateBlock(kind, title, sub) {
+
+function stateBlock(
+  type,
+  title,
+  message
+) {
+
   return `
-    <div class="state-block ${kind === "error" ? "error" : ""}">
+    <div class="state-block ${type === "error" ? "error" : ""}">
+
       <p class="state-block__title">
         ${escapeHtml(title)}
       </p>
 
       <p class="state-block__sub">
-        ${escapeHtml(sub)}
+        ${escapeHtml(message)}
       </p>
+
     </div>
   `;
 }
 
+
+function getAccountId(account) {
+
+  return (
+    account?.id ??
+    account?.account_id ??
+    account?.pk ??
+    ""
+  );
+}
+
+
+function getAccountName(account) {
+
+  return (
+    account?.name ??
+    account?.owner_name ??
+    account?.account_name ??
+    "—"
+  );
+}
+
+
 // ============================================================
-// Skeletons
+// SKELETONS
 // ============================================================
 
-function skeletonTableRows(n = 6) {
-  let rows = "";
+function skeletonTableRows(count = 7) {
 
-  for (let i = 0; i < n; i++) {
-    rows += `
+  let html = `
+    <div class="skeleton-table">
+  `;
+
+  for (let i = 0; i < count; i++) {
+
+    html += `
       <div class="skeleton-table-row">
-        <div class="skeleton skeleton-line" style="width:70%"></div>
-        <div class="skeleton skeleton-line" style="width:85%"></div>
-        <div class="skeleton skeleton-line" style="width:50%"></div>
-        <div class="skeleton skeleton-line" style="width:40%"></div>
+
+        <div
+          class="skeleton skeleton-line"
+          style="width: 65%"
+        ></div>
+
+        <div
+          class="skeleton skeleton-line"
+          style="width: 82%"
+        ></div>
+
+        <div
+          class="skeleton skeleton-line"
+          style="width: 45%"
+        ></div>
+
+        <div
+          class="skeleton skeleton-line"
+          style="width: 40%"
+        ></div>
+
       </div>
     `;
   }
 
-  return rows;
+  html += `</div>`;
+
+  return html;
 }
 
-function skeletonCards(n = 2) {
-  let cards = "";
 
-  for (let i = 0; i < n; i++) {
-    cards += `
+function skeletonCards(count = 3) {
+
+  let html = "";
+
+  for (let i = 0; i < count; i++) {
+
+    html += `
       <div class="skeleton-card">
-        <div class="skeleton skeleton-line" style="width:35%"></div>
-        <div class="skeleton skeleton-line" style="width:60%"></div>
-        <div class="skeleton skeleton-line" style="width:45%"></div>
-        <div class="skeleton skeleton-line" style="width:20%"></div>
+
+        <div
+          class="skeleton skeleton-line"
+          style="width: 35%; height: 18px"
+        ></div>
+
+        <div
+          class="skeleton skeleton-line"
+          style="width: 78%"
+        ></div>
+
+        <div
+          class="skeleton skeleton-line"
+          style="width: 100%; height: 70px; margin-top: 12px"
+        ></div>
+
+        <div
+          class="skeleton skeleton-line"
+          style="width: 48%; margin-top: 12px"
+        ></div>
+
       </div>
     `;
   }
 
-  return cards;
+  return html;
 }
+
 
 function skeletonDetail() {
+
   return `
     <div class="skeleton-detail-block">
+
       <div
-        class="skeleton skeleton-line"
-        style="width:120px;height:22px;"
+        class="skeleton"
+        style="width: 90px; height: 24px"
       ></div>
 
       <div
-        class="skeleton skeleton-line"
-        style="width:70%;height:44px;border-radius:12px;"
+        class="skeleton"
+        style="width: 230px; height: 24px"
       ></div>
 
       <div
-        class="skeleton skeleton-line"
-        style="width:100%;height:120px;border-radius:12px;"
+        class="skeleton"
+        style="width: 100%; height: 105px; border-radius: 10px"
       ></div>
+
+      <div
+        class="skeleton"
+        style="width: 100%; height: 150px; border-radius: 10px"
+      ></div>
+
     </div>
   `;
 }
 
+
 // ============================================================
-// Health check
+// HEALTH
 // ============================================================
 
 async function checkHealth() {
-  $("healthDot").className = "health-dot checking";
-  $("healthLabel").textContent = "Checking status…";
+
+  setHealth("checking");
 
   try {
+
     const data = await apiGet("/health");
 
-    const dbUp =
-      data.status === "ok" ||
-      data.db === true ||
-      data.database === "up" ||
-      data.database?.status === "up";
+    const explicitlyDown =
+      data?.status === "down" ||
+      data?.db === false ||
+      data?.database === "down" ||
+      data?.database?.status === "down";
 
-    const dbDown =
-      data.status === "down" ||
-      data.db === false ||
-      data.database === "down" ||
-      data.database?.status === "down";
+    if (explicitlyDown) {
+      setHealth("down");
+    } else {
+      setHealth("up");
+    }
 
-    setHealth(dbDown && !dbUp ? false : true);
+  } catch {
 
-  } catch (e) {
-    setHealth(false);
+    setHealth("down");
   }
 }
 
-function setHealth(isUp) {
+
+function setHealth(status) {
+
   const dot = $("healthDot");
   const label = $("healthLabel");
   const banner = $("errorBanner");
 
-  if (isUp) {
-    dot.className = "health-dot up";
-    label.textContent = "System operational";
+  dot.className =
+    `health-dot ${status}`;
 
-    if (banner) {
-      banner.classList.add("hidden");
-    }
-  } else {
-    dot.className = "health-dot down";
-    label.textContent = "Backend unavailable";
+  if (status === "up") {
 
-    if (banner) {
-      banner.classList.remove("hidden");
-    }
+    label.textContent =
+      "System operational";
+
+    banner?.classList.add("hidden");
+
+    return;
   }
+
+  if (status === "checking") {
+
+    label.textContent =
+      "Checking system";
+
+    return;
+  }
+
+  label.textContent =
+    "Backend unavailable";
+
+  banner?.classList.remove("hidden");
 }
 
+
 // ============================================================
-// Tabs
+// TABS
 // ============================================================
 
 function initTabs() {
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => {
-        b.classList.remove("active");
-        b.setAttribute("aria-selected", "false");
-      });
 
-      btn.classList.add("active");
-      btn.setAttribute("aria-selected", "true");
+  document
+    .querySelectorAll(".tab-btn")
+    .forEach((button) => {
 
-      const target = btn.dataset.tab;
+      button.addEventListener(
+        "click",
+        () => {
 
-      document
-        .querySelectorAll(".view")
-        .forEach((v) => v.classList.remove("active"));
+          const target =
+            button.dataset.tab;
 
-      $(`view-${target}`).classList.add("active");
+          document
+            .querySelectorAll(".tab-btn")
+            .forEach((btn) => {
+
+              const active =
+                btn === button;
+
+              btn.classList.toggle(
+                "active",
+                active
+              );
+
+              btn.setAttribute(
+                "aria-selected",
+                String(active)
+              );
+            });
+
+          document
+            .querySelectorAll(".view")
+            .forEach((view) => {
+
+              view.classList.toggle(
+                "active",
+                view.id === `view-${target}`
+              );
+            });
+
+        }
+      );
+
     });
-  });
 }
 
-function initCategoryChips() {
-  document.querySelectorAll(".category-chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      $(chip.dataset.jump)?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-  });
-}
 
 // ============================================================
-// Overview stats
+// CATEGORY NAVIGATION
+// ============================================================
+
+function initCategoryChips() {
+
+  document
+    .querySelectorAll(".category-chip")
+    .forEach((chip) => {
+
+      chip.addEventListener(
+        "click",
+        () => {
+
+          const target =
+            $(chip.dataset.jump);
+
+          if (!target) {
+            return;
+          }
+
+          target.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+
+        }
+      );
+
+    });
+}
+
+
+// ============================================================
+// OVERVIEW
 // ============================================================
 
 async function loadOverviewStats() {
-  try {
-    const data = await apiGet("/transactions");
 
-    const totalTransactions =
-      data.transaction_count ??
-      data.count ??
-      0;
+  $("statTransactions").textContent = "…";
+
+  try {
+
+    const data =
+      await apiGet("/transactions");
+
+    const total =
+      data?.transaction_count ??
+      data?.count ??
+      (Array.isArray(data)
+        ? data.length
+        : 0);
 
     $("statTransactions").textContent =
-      Number(totalTransactions).toLocaleString("en-IN");
+      Number(total).toLocaleString("en-IN");
 
-  } catch (e) {
-    $("statTransactions").textContent = "—";
+  } catch {
+
+    $("statTransactions").textContent =
+      "—";
   }
 }
 
 
 function updateDetectionStats() {
+
   const total =
     state.cycles.length +
     state.fanouts.length +
     state.convergence.length;
 
-  $("statSuspicious").textContent = total;
-  $("statRings").textContent = state.cycles.length;
+  $("statSuspicious").textContent =
+    total.toLocaleString("en-IN");
+
+  $("statRings").textContent =
+    state.cycles.length.toLocaleString("en-IN");
 }
 
+
 // ============================================================
-// Accounts
+// ACCOUNTS
 // ============================================================
 
 async function loadAccounts() {
-  const tbody = $("accountsTableBody");
 
-  tbody.innerHTML = "";
-  $("accountsResultCount").textContent = "";
+  if (state.loading.accounts) {
+    return;
+  }
 
-  const wrap = document.querySelector(".table-wrap");
+  state.loading.accounts = true;
 
-  tbody.parentElement.style.display = "none";
+  const workspace =
+    $("accountsListState");
 
-  wrap.insertAdjacentHTML(
-    "afterbegin",
-    `<div id="accountsSkeleton">${skeletonTableRows()}</div>`
-  );
+  const tableWrap =
+    workspace.querySelector(".table-wrap");
+
+  tableWrap.innerHTML =
+    skeletonTableRows();
+
+  $("accountsResultCount").textContent =
+    "Loading…";
+
+  $("statAccounts").textContent =
+    "…";
 
   try {
-    const data = await apiGet("/accounts");
 
-    const accounts = asList(data);
+    const data =
+      await apiGet("/accounts");
 
-    state.accounts = accounts;
+    state.accounts =
+      asList(data);
 
-    $("statAccounts").textContent = accounts.length;
+    $("statAccounts").textContent =
+      state.accounts.length.toLocaleString("en-IN");
 
-    renderAccountsTable(accounts);
+    renderAccountsTable(
+      state.accounts
+    );
 
-  } catch (e) {
-    $("accountsSkeleton")?.remove();
+  } catch (error) {
 
-    tbody.parentElement.style.display = "";
+    $("statAccounts").textContent =
+      "—";
 
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="4">
-          ${stateBlock(
-            "error",
-            "Couldn't load accounts",
-            e.message
-          )}
-        </td>
-      </tr>
-    `;
+    $("accountsResultCount").textContent =
+      "Unavailable";
+
+    tableWrap.innerHTML =
+      stateBlock(
+        "error",
+        "Accounts unavailable",
+        getFriendlyError(error)
+      );
+
+  } finally {
+
+    state.loading.accounts = false;
   }
 }
 
+
 function renderAccountsTable(accounts) {
-  $("accountsSkeleton")?.remove();
 
-  const table = document.querySelector(".data-table");
-
-  table.style.display = "";
-
-  const tbody = $("accountsTableBody");
+  const tableWrap =
+    document.querySelector(
+      "#accountsListState .table-wrap"
+    );
 
   $("accountsResultCount").textContent =
     accounts.length === state.accounts.length
@@ -344,207 +622,317 @@ function renderAccountsTable(accounts) {
       : `${accounts.length} of ${state.accounts.length} accounts`;
 
   if (accounts.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="4">
-          ${stateBlock(
-            "empty",
-            "No accounts found",
-            "Try adjusting your search."
-          )}
-        </td>
-      </tr>
-    `;
+
+    tableWrap.innerHTML =
+      stateBlock(
+        "empty",
+        "No accounts found",
+        "No account matches the current search."
+      );
 
     return;
   }
 
-  tbody.innerHTML = accounts
-    .map((acc) => {
-      const id =
-        acc.id ??
-        acc.account_id ??
-        acc.pk;
+  tableWrap.innerHTML = `
+    <table class="data-table">
 
-      const name =
-        acc.name ??
-        acc.owner_name ??
-        acc.account_name ??
-        "—";
-
-      const type =
-        acc.type ??
-        acc.account_type ??
-        "—";
-
-      const activity =
-        acc.transaction_count ??
-        acc.txn_count ??
-        acc.activity_count ??
-        acc.num_transactions;
-
-      return `
-        <tr data-id="${escapeHtml(id)}">
-
-          <td>
-            ${escapeHtml(id)}
-          </td>
-
-          <td>
-            ${escapeHtml(name)}
-          </td>
-
-          <td>
-            ${escapeHtml(type)}
-          </td>
-
-          <td>
-            ${
-              activity !== undefined
-                ? escapeHtml(activity) + " txns"
-                : "—"
-            }
-          </td>
-
+      <thead>
+        <tr>
+          <th scope="col">Account</th>
+          <th scope="col">Owner</th>
+          <th scope="col">Type</th>
+          <th scope="col">Activity</th>
         </tr>
-      `;
-    })
-    .join("");
+      </thead>
+
+      <tbody id="accountsTableBody">
+      </tbody>
+
+    </table>
+  `;
+
+  const tbody =
+    $("accountsTableBody");
+
+  tbody.innerHTML =
+    accounts
+      .map(renderAccountRow)
+      .join("");
 
   tbody
     .querySelectorAll("tr[data-id]")
     .forEach((row) => {
-      row.addEventListener("click", () => {
-        showAccountDetail(row.dataset.id);
-      });
+
+      row.addEventListener(
+        "click",
+        () => {
+          showAccountDetail(
+            row.dataset.id
+          );
+        }
+      );
+
     });
 }
 
+
+function renderAccountRow(account) {
+
+  const id =
+    getAccountId(account);
+
+  const name =
+    getAccountName(account);
+
+  const type =
+    account?.type ??
+    account?.account_type ??
+    "—";
+
+  const activity =
+    account?.transaction_count ??
+    account?.txn_count ??
+    account?.activity_count ??
+    account?.num_transactions;
+
+  return `
+    <tr data-id="${escapeHtml(id)}">
+
+      <td>
+        ${escapeHtml(id)}
+      </td>
+
+      <td>
+        ${escapeHtml(name)}
+      </td>
+
+      <td>
+        ${escapeHtml(type)}
+      </td>
+
+      <td>
+        ${
+          activity !== undefined
+            ? `${escapeHtml(activity)} txns`
+            : "—"
+        }
+      </td>
+
+    </tr>
+  `;
+}
+
+
 // ============================================================
-// Account search
+// ACCOUNT SEARCH
 // ============================================================
 
 function initAccountSearch() {
-  $("accountSearch").addEventListener("input", (e) => {
-    const q = e.target.value
-      .trim()
-      .toLowerCase();
 
-    if (!q) {
-      renderAccountsTable(state.accounts);
-      return;
-    }
+  const input =
+    $("accountSearch");
 
-    const filtered = state.accounts.filter((acc) => {
-      const id = String(
-        acc.id ??
-        acc.account_id ??
-        acc.pk ??
-        ""
-      ).toLowerCase();
+  input.addEventListener(
+    "input",
+    (event) => {
 
-      const name = String(
-        acc.name ??
-        acc.owner_name ??
-        acc.account_name ??
-        ""
-      ).toLowerCase();
+      const query =
+        event.target.value
+          .trim()
+          .toLowerCase();
 
-      return (
-        id.includes(q) ||
-        name.includes(q)
+      if (!query) {
+
+        renderAccountsTable(
+          state.accounts
+        );
+
+        return;
+      }
+
+      const filtered =
+        state.accounts.filter(
+          (account) => {
+
+            const id =
+              String(
+                getAccountId(account)
+              ).toLowerCase();
+
+            const name =
+              String(
+                getAccountName(account)
+              ).toLowerCase();
+
+            return (
+              id.includes(query) ||
+              name.includes(query)
+            );
+          }
+        );
+
+      renderAccountsTable(
+        filtered
       );
-    });
+    }
+  );
 
-    renderAccountsTable(filtered);
-  });
+  document.addEventListener(
+    "keydown",
+    (event) => {
+
+      if (
+        event.key === "/" &&
+        document.activeElement !== input
+      ) {
+
+        event.preventDefault();
+
+        input.focus();
+      }
+    }
+  );
 }
 
+
 // ============================================================
-// Account details
+// ACCOUNT DETAIL
 // ============================================================
 
 function showAccountDetail(id) {
-  $("accountsListState").classList.add("hidden");
-  $("accountDetailState").classList.remove("hidden");
 
-  $("accountDetailContent").innerHTML =
+  state.activeAccountId = id;
+
+  $("accountsListState")
+    .classList
+    .add("hidden");
+
+  $("accountDetailState")
+    .classList
+    .remove("hidden");
+
+  $("accountDetailContent")
+    .innerHTML =
     skeletonDetail();
 
   loadAccountDetail(id);
 }
 
+
 function initBackToAccounts() {
-  $("backToAccounts").addEventListener("click", () => {
-    $("accountDetailState").classList.add("hidden");
-    $("accountsListState").classList.remove("hidden");
-  });
+
+  $("backToAccounts")
+    .addEventListener(
+      "click",
+      () => {
+
+        state.activeAccountId =
+          null;
+
+        $("accountDetailState")
+          .classList
+          .add("hidden");
+
+        $("accountsListState")
+          .classList
+          .remove("hidden");
+
+      }
+    );
 }
 
+
 async function loadAccountDetail(id) {
-  const content = $("accountDetailContent");
+
+  if (state.loading.transactions) {
+    return;
+  }
+
+  state.loading.transactions = true;
 
   try {
-    const data = await apiGet(
-      `/accounts/${encodeURIComponent(id)}/transactions`
+
+    const data =
+      await apiGet(
+        `/accounts/${encodeURIComponent(id)}/transactions`
+      );
+
+    renderAccountDetail(
+      id,
+      {
+        outgoing:
+          Array.isArray(data?.outgoing)
+            ? data.outgoing
+            : [],
+
+        incoming:
+          Array.isArray(data?.incoming)
+            ? data.incoming
+            : [],
+      }
     );
 
-    const outgoing = Array.isArray(data.outgoing)
-      ? data.outgoing
-      : [];
+  } catch (error) {
 
-    const incoming = Array.isArray(data.incoming)
-      ? data.incoming
-      : [];
+    $("accountDetailContent")
+      .innerHTML =
+      stateBlock(
+        "error",
+        "Transaction data unavailable",
+        getFriendlyError(error)
+      );
 
-    renderAccountDetail(id, {
-      outgoing,
-      incoming,
-    });
+  } finally {
 
-  } catch (e) {
-    content.innerHTML = stateBlock(
-      "error",
-      "Couldn't load transactions",
-      e.message
-    );
+    state.loading.transactions = false;
   }
 }
 
-function renderAccountDetail(accountId, transactionData) {
-  const content = $("accountDetailContent");
 
-  const outgoing = transactionData.outgoing ?? [];
-  const incoming = transactionData.incoming ?? [];
+function renderAccountDetail(
+  accountId,
+  transactionData
+) {
 
-  const txns = [
-    ...outgoing.map((t) => ({
-      ...t,
+  const content =
+    $("accountDetailContent");
+
+  const outgoing =
+    transactionData.outgoing ?? [];
+
+  const incoming =
+    transactionData.incoming ?? [];
+
+  const transactions = [
+    ...outgoing.map((transaction) => ({
+      ...transaction,
       from_account: accountId,
-      to_account: t.account_id,
+      to_account:
+        transaction.account_id ??
+        transaction.to_account,
     })),
 
-    ...incoming.map((t) => ({
-      ...t,
-      from_account: t.account_id,
+    ...incoming.map((transaction) => ({
+      ...transaction,
+      from_account:
+        transaction.account_id ??
+        transaction.from_account,
       to_account: accountId,
     })),
   ];
 
-  const account = state.accounts.find(
-    (a) =>
-      String(
-        a.id ??
-        a.account_id ??
-        a.pk
-      ) === String(accountId)
-  );
+  const account =
+    state.accounts.find(
+      (item) =>
+        String(
+          getAccountId(item)
+        ) === String(accountId)
+    );
 
   const name =
-    account?.name ??
-    account?.owner_name ??
-    account?.account_name ??
-    "";
+    account
+      ? getAccountName(account)
+      : "";
 
   let html = `
     <div class="detail-header">
@@ -554,7 +942,7 @@ function renderAccountDetail(accountId, transactionData) {
       </span>
 
       ${
-        name
+        name && name !== "—"
           ? `
             <span class="detail-header__name">
               ${escapeHtml(name)}
@@ -570,27 +958,41 @@ function renderAccountDetail(accountId, transactionData) {
     </p>
   `;
 
-  if (txns.length === 0) {
+  if (transactions.length === 0) {
+
     html += stateBlock(
       "empty",
       "No transaction activity",
-      "This account has no recorded transactions."
+      "This account has no recorded incoming or outgoing transactions."
     );
 
-    content.innerHTML = html;
+    content.innerHTML =
+      html;
 
     return;
   }
 
-  
 
-  const largest = [...txns].sort(
-    (a, b) =>
-      (Number(b.amount ?? b.value) || 0) -
-      (Number(a.amount ?? a.value) || 0)
-  )[0];
+  const largest =
+    [...transactions].sort(
+      (a, b) =>
+        (
+          Number(
+            b.amount ??
+            b.value
+          ) || 0
+        ) -
+        (
+          Number(
+            a.amount ??
+            a.value
+          ) || 0
+        )
+    )[0];
+
 
   if (largest) {
+
     const from =
       largest.from_account ??
       largest.sender ??
@@ -617,7 +1019,9 @@ function renderAccountDetail(accountId, transactionData) {
         <div class="flow-arrow-wrap">
 
           <span class="amount">
-            ${escapeHtml(formatAmount(amount))}
+            ${escapeHtml(
+              formatAmount(amount)
+            )}
           </span>
 
           <div class="flow-arrow-line"></div>
@@ -632,46 +1036,9 @@ function renderAccountDetail(accountId, transactionData) {
     `;
   }
 
-  const renderTxnLine = (t, direction) => {
-    const peer =
-      direction === "out"
-        ? t.to_account ??
-          t.receiver ??
-          t.destination
-        : t.from_account ??
-          t.sender ??
-          t.source;
-
-    const amount =
-      t.amount ??
-      t.value;
-
-    const arrow =
-      direction === "out"
-        ? "→"
-        : "←";
-
-    return `
-      <div class="txn-line">
-
-        <span class="txn-line__amount ${direction}">
-          ${escapeHtml(formatAmount(amount))}
-        </span>
-
-        <span class="txn-line__peer">
-          ${arrow}
-          ${escapeHtml(peer)}
-        </span>
-
-      </div>
-    `;
-  };
 
   html += `
-    <p
-      class="detail-sub"
-      style="margin-top:8px;"
-    >
+    <p class="detail-sub">
       Recent transactions
     </p>
 
@@ -679,21 +1046,27 @@ function renderAccountDetail(accountId, transactionData) {
 
       <div class="txn-col">
 
-        <h3>Outgoing</h3>
+        <h3>
+          Outgoing
+        </h3>
 
         <div class="txn-col-panel">
 
           ${
             outgoing.length
               ? outgoing
-                  .map((t) =>
-                    renderTxnLine(t, "out")
+                  .map(
+                    (transaction) =>
+                      renderTxnLine(
+                        transaction,
+                        "out"
+                      )
                   )
                   .join("")
               : stateBlock(
                   "empty",
                   "No outgoing transfers",
-                  "This account hasn't sent any money."
+                  "This account has not sent any recorded funds."
                 )
           }
 
@@ -701,23 +1074,30 @@ function renderAccountDetail(accountId, transactionData) {
 
       </div>
 
+
       <div class="txn-col">
 
-        <h3>Incoming</h3>
+        <h3>
+          Incoming
+        </h3>
 
         <div class="txn-col-panel">
 
           ${
             incoming.length
               ? incoming
-                  .map((t) =>
-                    renderTxnLine(t, "in")
+                  .map(
+                    (transaction) =>
+                      renderTxnLine(
+                        transaction,
+                        "in"
+                      )
                   )
                   .join("")
               : stateBlock(
                   "empty",
                   "No incoming transfers",
-                  "This account hasn't received any money."
+                  "This account has not received any recorded funds."
                 )
           }
 
@@ -728,35 +1108,62 @@ function renderAccountDetail(accountId, transactionData) {
     </div>
   `;
 
-  content.innerHTML = html;
+  content.innerHTML =
+    html;
 }
+
+
+function renderTxnLine(
+  transaction,
+  direction
+) {
+
+  const peer =
+    direction === "out"
+      ? transaction.to_account ??
+        transaction.receiver ??
+        transaction.destination ??
+        "Unknown"
+      : transaction.from_account ??
+        transaction.sender ??
+        transaction.source ??
+        "Unknown";
+
+  const amount =
+    transaction.amount ??
+    transaction.value;
+
+  const arrow =
+    direction === "out"
+      ? "→"
+      : "←";
+
+  return `
+    <div class="txn-line">
+
+      <span
+        class="txn-line__amount ${direction}"
+      >
+        ${escapeHtml(
+          formatAmount(amount)
+        )}
+      </span>
+
+      <span class="txn-line__peer">
+        ${arrow}
+        ${escapeHtml(peer)}
+      </span>
+
+    </div>
+  `;
+}
+
 
 // ============================================================
 // DETECTIONS
 // ============================================================
 
 async function loadAllDetections() {
-  /*
-    IMPORTANT:
-
-    Your backend exposes:
-
-      GET /api/detections/cycles
-
-    and
-
-      GET /api/detections/fanout
-
-    The fanout response contains BOTH:
-
-      fanout
-      convergence
-
-    There is NO:
-      /api/detections/convergence
-
-    Therefore we make only two requests.
-  */
 
   await Promise.all([
     loadCycles(),
@@ -764,104 +1171,120 @@ async function loadAllDetections() {
   ]);
 }
 
+
 // ============================================================
-// Cycles
+// CYCLES
 // ============================================================
 
 async function loadCycles() {
-  const el = $("cyclesList");
 
-  el.innerHTML = skeletonCards(2);
+  if (state.loading.cycles) {
+    return;
+  }
+
+  state.loading.cycles = true;
+
+  const element =
+    $("cyclesList");
+
+  element.innerHTML =
+    skeletonCards(3);
+
+  $("chipCycles").textContent =
+    "…";
 
   try {
-    const data = await apiGet("/detections/cycles");
-    console.log("CYCLE RAW RESPONSE:", JSON.stringify(data, null, 2));
 
-    /*
-      Expected backend response is something
-      like:
-
-      {
-        "count": 5,
-        "cycles": [...]
-      }
-    */
+    const data =
+      await apiGet(
+        "/detections/cycles"
+      );
 
     const items =
       Array.isArray(data)
         ? data
-        : Array.isArray(data.cycles)
+        : Array.isArray(data?.cycles)
           ? data.cycles
-          : Array.isArray(data.results)
+          : Array.isArray(data?.results)
             ? data.results
             : [];
 
-    state.cycles = items;
+    state.cycles =
+      items;
 
     $("chipCycles").textContent =
       items.length;
 
-    updateDetectionStats();
+    element.innerHTML =
+      items.length
+        ? items
+            .map(renderCyclePattern)
+            .join("")
+        : stateBlock(
+            "empty",
+            "No cycles detected",
+            "The detection engine has not identified circular transaction flow."
+          );
 
-    el.innerHTML = items.length
-      ? items
-          .map(renderCyclePattern)
-          .join("")
-      : stateBlock(
-          "empty",
-          "No suspicious patterns detected",
-          "The system hasn't identified any patterns matching this category."
-        );
+  } catch (error) {
 
-  } catch (e) {
     state.cycles = [];
 
-    $("chipCycles").textContent = "!";
+    $("chipCycles").textContent =
+      "—";
 
-    el.innerHTML = stateBlock(
-      "error",
-      "Couldn't load cycles",
-      e.message
-    );
+    element.innerHTML =
+      stateBlock(
+        "error",
+        "Cycle detection unavailable",
+        getFriendlyError(error)
+      );
+
+  } finally {
+
+    state.loading.cycles = false;
 
     updateDetectionStats();
   }
 }
 
+
 // ============================================================
-// Fan-out + convergence
+// FAN-OUT + CONVERGENCE
 // ============================================================
 
 async function loadFanoutAndConvergence() {
-  const fanoutEl = $("fanoutList");
-  const convergenceEl = $("convergenceList");
 
-  fanoutEl.innerHTML =
-    skeletonCards(2);
+  if (state.loading.fanout) {
+    return;
+  }
 
-  convergenceEl.innerHTML =
-    skeletonCards(2);
+  state.loading.fanout = true;
+
+  const fanoutElement =
+    $("fanoutList");
+
+  const convergenceElement =
+    $("convergenceList");
+
+  fanoutElement.innerHTML =
+    skeletonCards(3);
+
+  convergenceElement.innerHTML =
+    skeletonCards(3);
+
+  $("chipFanout").textContent =
+    "…";
+
+  $("chipConvergence").textContent =
+    "…";
 
   try {
-    const data = await apiGet(
-      "/detections/fanout"
-    );
 
-    /*
-      Your ACTUAL backend response:
-
-      {
-        "fanout": {
-          "count": 8,
-          "detections": [...]
-        },
-
-        "convergence": {
-          "count": 3,
-          "detections": [...]
-        }
-      }
-    */
+    const data =
+      await apiGet(
+        "/detections/fanout"
+      );
 
     const fanoutData =
       data?.fanout ?? {};
@@ -883,9 +1306,12 @@ async function loadFanoutAndConvergence() {
         ? convergenceData.detections
         : [];
 
-    state.fanouts = fanoutItems;
+    state.fanouts =
+      fanoutItems;
+
     state.convergence =
       convergenceItems;
+
 
     $("chipFanout").textContent =
       fanoutItems.length;
@@ -893,109 +1319,126 @@ async function loadFanoutAndConvergence() {
     $("chipConvergence").textContent =
       convergenceItems.length;
 
-    updateDetectionStats();
 
-    // --------------------------
-    // Fan-outs
-    // --------------------------
-
-    fanoutEl.innerHTML =
+    fanoutElement.innerHTML =
       fanoutItems.length
         ? fanoutItems
             .map(renderFanoutPattern)
             .join("")
         : stateBlock(
             "empty",
-            "No suspicious patterns detected",
-            "The system hasn't identified any patterns matching this category."
+            "No fan-outs detected",
+            "No one-to-many transaction distribution matches the detection criteria."
           );
 
-    // --------------------------
-    // Convergence
-    // --------------------------
 
-    convergenceEl.innerHTML =
+    convergenceElement.innerHTML =
       convergenceItems.length
         ? convergenceItems
-            .map(renderConvergencePattern)
+            .map(
+              renderConvergencePattern
+            )
             .join("")
         : stateBlock(
             "empty",
-            "No suspicious patterns detected",
-            "The system hasn't identified any patterns matching this category."
+            "No convergence detected",
+            "No many-to-one transaction aggregation matches the detection criteria."
           );
 
-  } catch (e) {
+  } catch (error) {
+
     state.fanouts = [];
     state.convergence = [];
 
-    $("chipFanout").textContent = "!";
-    $("chipConvergence").textContent = "!";
+    $("chipFanout").textContent =
+      "—";
 
-    fanoutEl.innerHTML = stateBlock(
-      "error",
-      "Couldn't load fan-outs",
-      e.message
-    );
+    $("chipConvergence").textContent =
+      "—";
 
-    convergenceEl.innerHTML =
+    fanoutElement.innerHTML =
       stateBlock(
         "error",
-        "Couldn't load convergence patterns",
-        e.message
+        "Fan-out detection unavailable",
+        getFriendlyError(error)
       );
+
+    convergenceElement.innerHTML =
+      stateBlock(
+        "error",
+        "Convergence detection unavailable",
+        getFriendlyError(error)
+      );
+
+  } finally {
+
+    state.loading.fanout = false;
 
     updateDetectionStats();
   }
 }
 
+
 // ============================================================
-// Cycle renderer
+// CYCLE RENDERER
 // ============================================================
 
-function renderCyclePattern(c) {
-  /*
-    We support the likely field names used by
-    the detector.
+function renderCyclePattern(cycle) {
 
-    If the backend returns an array under one of
-    these properties, it will render correctly.
-  */
+  const rawChain =
+    cycle.accounts ??
+    cycle.account_chain ??
+    cycle.cycle ??
+    cycle.nodes ??
+    cycle.path ??
+    cycle.account_ids ??
+    cycle.nodes_in_cycle ??
+    cycle.ring ??
+    cycle.ring_accounts ??
+    cycle.chain ??
+    cycle.sequence ??
+    cycle.account_sequence ??
+    cycle.cycle_accounts ??
+    cycle.members ??
+    cycle.accounts_in_cycle ??
+    [];
 
-    const rawChain =
-    c.accounts ?? c.account_chain ?? c.cycle ?? c.nodes ?? c.path ??
-    c.account_ids ?? c.nodes_in_cycle ?? c.ring ?? c.ring_accounts ??
-    c.chain ?? c.sequence ?? c.account_sequence ?? c.cycle_accounts ??
-    c.members ?? c.accounts_in_cycle ?? [];
-
-  // Handle both ["A014", "A027", ...] and [{account_id: "A014"}, ...]
-  const normalizedChain = Array.isArray(rawChain)
-    ? rawChain.map((n) => (typeof n === "object" && n !== null ? (n.account_id ?? n.id ?? n.account ?? JSON.stringify(n)) : n))
-    : [];
+  const normalizedChain =
+    Array.isArray(rawChain)
+      ? rawChain.map(
+          (node) =>
+            typeof node === "object" &&
+            node !== null
+              ? (
+                  node.account_id ??
+                  node.id ??
+                  node.account ??
+                  JSON.stringify(node)
+                )
+              : node
+        )
+      : [];
 
   const window =
-    c.time_window ??
-    c.window ??
-    c.duration ??
-    c.span_hours ??
+    cycle.time_window ??
+    cycle.window ??
+    cycle.duration ??
+    cycle.span_hours ??
     "";
 
-  const txnCount =
-  c.transaction_count ??
-  c.txn_count ??
-  c.transactions ??
-  normalizedChain.length;
+  const transactionCount =
+    cycle.transaction_count ??
+    cycle.txn_count ??
+    cycle.transactions ??
+    normalizedChain.length;
 
-  /*
-    Don't show a fake cycle with "0 accounts".
 
-    If your backend has not supplied nodes,
-    clearly identify the issue.
-  */
+  if (
+    normalizedChain.length === 0
+  ) {
 
-  if (normalizedChain.length === 0) {
     return `
-      <div class="pattern-card">
+      <article class="pattern-card">
 
         <span class="pattern-card__badge">
           Cycle detected
@@ -1005,37 +1448,24 @@ function renderCyclePattern(c) {
           Circular transaction flow
         </p>
 
-        <div class="state-block">
-
-          <p class="state-block__title">
-            Cycle details unavailable
-          </p>
-
-          <p class="state-block__sub">
-            The backend returned a cycle without account nodes.
-          </p>
-
-        </div>
+        ${stateBlock(
+          "error",
+          "Cycle details unavailable",
+          "The backend returned a cycle without account nodes."
+        )}
 
         <div class="pattern-card__meta">
-
-          0 accounts
-          · ${escapeHtml(txnCount)}
+          0 accounts ·
+          ${escapeHtml(transactionCount)}
           transactions
-
-          ${
-            window
-              ? ` · window ${escapeHtml(window)}`
-              : ""
-          }
-
         </div>
 
-      </div>
+      </article>
     `;
   }
 
-  const nodesHtml =
+
+  const nodes =
     normalizedChain
       .map(
         (node, index) => `
@@ -1061,8 +1491,9 @@ function renderCyclePattern(c) {
       )
       .join("");
 
+
   return `
-    <div class="pattern-card">
+    <article class="pattern-card">
 
       <span class="pattern-card__badge">
         Cycle detected
@@ -1074,58 +1505,78 @@ function renderCyclePattern(c) {
 
       <div class="cycle-chain">
 
-        ${nodesHtml}
+        ${nodes}
 
         <div class="cycle-loop-back">
-          ↩ back to
-          ${escapeHtml(normalizedChain[0])}
+          ↩ returns to
+          ${escapeHtml(
+            normalizedChain[0]
+          )}
         </div>
 
       </div>
 
       <div class="pattern-card__meta">
 
-        ${escapeHtml(normalizedChain.length)}
+        ${normalizedChain.length}
         accounts
 
         ·
 
-        ${escapeHtml(txnCount)}
+        ${escapeHtml(
+          transactionCount
+        )}
         transactions
 
         ${
           window
-            ? ` · window ${escapeHtml(window)}`
+            ? ` · ${escapeHtml(window)}`
             : ""
         }
 
       </div>
 
-    </div>
+    </article>
   `;
 }
 
+
 // ============================================================
-// Fan-out renderer
+// FAN-OUT RENDERER
 // ============================================================
 
-function renderFanoutPattern(f) {
+function renderFanoutPattern(
+  fanout
+) {
+
   const source =
-    f.source_account ??
-    f.hub ??
-    f.origin ??
+    fanout.source_account ??
+    fanout.hub ??
+    fanout.origin ??
     "Unknown";
 
   const targets =
-    f.recipients ??
-    f.target_accounts ??
-    f.targets ??
+    fanout.recipients ??
+    fanout.target_accounts ??
+    fanout.targets ??
     [];
 
   const normalizedTargets =
     Array.isArray(targets)
-      ? targets
+      ? targets.map(
+          (target) =>
+            typeof target === "object" &&
+            target !== null
+              ? (
+                  target.account_id ??
+                  target.id ??
+                  target.account ??
+                  JSON.stringify(target)
+                )
+              : target
+        )
       : [];
+
 
   const rows =
     normalizedTargets
@@ -1146,20 +1597,22 @@ function renderFanoutPattern(f) {
       )
       .join("");
 
-  const windowStart =
-    f.window_start ??
-    f.timestamp ??
-    f.created_at;
+
+  const timestamp =
+    fanout.window_start ??
+    fanout.timestamp ??
+    fanout.created_at;
+
 
   return `
-    <div class="pattern-card">
+    <article class="pattern-card">
 
       <span class="pattern-card__badge">
         Fan-out detected
       </span>
 
       <p class="pattern-card__desc">
-        One account sending funds to multiple accounts
+        One account distributing funds across multiple destinations.
       </p>
 
       <div class="branch-diagram">
@@ -1178,44 +1631,60 @@ function renderFanoutPattern(f) {
 
       <div class="pattern-card__meta">
 
-        ${escapeHtml(normalizedTargets.length)}
+        ${normalizedTargets.length}
         recipients
 
         ${
-          windowStart
-            ? ` · ${escapeHtml(formatDate(windowStart))}`
+          timestamp
+            ? ` · ${escapeHtml(formatDate(timestamp))}`
             : ""
         }
 
       </div>
 
-    </div>
+    </article>
   `;
 }
 
+
 // ============================================================
-// Convergence renderer
+// CONVERGENCE RENDERER
 // ============================================================
 
-function renderConvergencePattern(c) {
+function renderConvergencePattern(
+  convergence
+) {
+
   const target =
-    c.collector_account ??
-    c.target_account ??
-    c.hub ??
-    c.destination ??
+    convergence.collector_account ??
+    convergence.target_account ??
+    convergence.hub ??
+    convergence.destination ??
     "Unknown";
 
   const sources =
-    c.recipients ??
-    c.source_accounts ??
-    c.sources ??
-    c.senders ??
+    convergence.recipients ??
+    convergence.source_accounts ??
+    convergence.sources ??
+    convergence.senders ??
     [];
 
   const normalizedSources =
     Array.isArray(sources)
-      ? sources
+      ? sources.map(
+          (source) =>
+            typeof source === "object" &&
+            source !== null
+              ? (
+                  source.account_id ??
+                  source.id ??
+                  source.account ??
+                  JSON.stringify(source)
+                )
+              : source
+        )
       : [];
+
 
   const rows =
     normalizedSources
@@ -1236,21 +1705,23 @@ function renderConvergencePattern(c) {
       )
       .join("");
 
+
   const span =
-    c.span_hours ??
-    c.time_window ??
-    c.window ??
+    convergence.span_hours ??
+    convergence.time_window ??
+    convergence.window ??
     "";
 
+
   return `
-    <div class="pattern-card">
+    <article class="pattern-card">
 
       <span class="pattern-card__badge">
         Convergence detected
       </span>
 
       <p class="pattern-card__desc">
-        Multiple accounts sending funds to one account
+        Multiple accounts funneling funds into one destination.
       </p>
 
       <div class="branch-diagram">
@@ -1269,7 +1740,7 @@ function renderConvergencePattern(c) {
 
       <div class="pattern-card__meta">
 
-        ${escapeHtml(normalizedSources.length)}
+        ${normalizedSources.length}
         sources
 
         ${
@@ -1280,35 +1751,122 @@ function renderConvergencePattern(c) {
 
       </div>
 
-    </div>
+    </article>
   `;
 }
 
+
 // ============================================================
-// Init
+// ERROR MESSAGES
+// ============================================================
+
+function getFriendlyError(
+  error
+) {
+
+  if (!error) {
+    return "An unknown error occurred.";
+  }
+
+  if (
+    error.message ===
+    "Unable to connect to the backend."
+  ) {
+
+    return "The API server could not be reached. Check that the backend is running.";
+  }
+
+  if (
+    error.message ===
+    "The backend request timed out."
+  ) {
+
+    return "The API server took too long to respond.";
+  }
+
+  if (
+    error.status === 404
+  ) {
+
+    return "The requested API endpoint was not found.";
+  }
+
+  if (
+    error.status >= 500
+  ) {
+
+    return "The backend encountered an internal error.";
+  }
+
+  return error.message ||
+    "Something went wrong while loading this data.";
+}
+
+
+// ============================================================
+// GLOBAL RETRY
+// ============================================================
+
+async function retryEverything() {
+
+  const button =
+    $("errorBannerRetry");
+
+  button.disabled = true;
+
+  button.textContent =
+    "Retrying…";
+
+  try {
+
+    await Promise.all([
+      checkHealth(),
+      loadAccounts(),
+      loadOverviewStats(),
+      loadAllDetections(),
+    ]);
+
+  } finally {
+
+    button.disabled = false;
+
+    button.textContent =
+      "Retry connection";
+  }
+}
+
+
+// ============================================================
+// INITIALIZATION
 // ============================================================
 
 function init() {
+
   initTabs();
-  initAccountSearch();
-  initBackToAccounts();
+
   initCategoryChips();
 
-  $("errorBannerRetry").addEventListener(
-    "click",
-    () => {
-      checkHealth();
-      loadAccounts();
-      loadOverviewStats();
-      loadAllDetections();
-    }
-  );
+  initAccountSearch();
+
+  initBackToAccounts();
+
+
+  $("errorBannerRetry")
+    .addEventListener(
+      "click",
+      retryEverything
+    );
+
 
   checkHealth();
+
   loadAccounts();
+
   loadOverviewStats();
+
   loadAllDetections();
 }
+
 
 document.addEventListener(
   "DOMContentLoaded",

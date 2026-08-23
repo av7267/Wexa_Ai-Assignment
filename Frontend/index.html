@@ -2,29 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="description"
+    content="Transaction intelligence dashboard for detecting suspicious money movement patterns."
+  >
 
   <title>Fraud Ring Detector — Transaction Intelligence</title>
 
-  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-  <!-- ========================================================
-       TOP NAVIGATION
-       ======================================================== -->
+  <!-- ======================================================
+       APPLICATION HEADER
+       ====================================================== -->
 
   <header class="topbar">
 
     <div class="brand">
-      <span class="brand-mark">◈</span>
+
+      <div class="brand-mark" aria-hidden="true">
+        FR
+      </div>
 
       <div class="brand-copy">
-        <span class="brand-name">Fraud Ring Detector</span>
-        <span class="brand-subtitle">Transaction Intelligence</span>
+        <span class="brand-name">
+          Fraud Ring Detector
+        </span>
+
+        <span class="brand-subtitle">
+          Transaction Intelligence Platform
+        </span>
       </div>
+
     </div>
+
 
     <nav
       class="tabs"
@@ -58,26 +84,30 @@
 
     </nav>
 
+
     <div
       class="system-status"
       aria-live="polite"
     >
+
       <span
         class="health-dot checking"
         id="healthDot"
+        aria-hidden="true"
       ></span>
 
       <span id="healthLabel">
-        Checking status…
+        Checking system
       </span>
+
     </div>
 
   </header>
 
 
-  <!-- ========================================================
-       BACKEND STATUS BANNER
-       ======================================================== -->
+  <!-- ======================================================
+       GLOBAL ERROR BANNER
+       ====================================================== -->
 
   <div
     id="errorBanner"
@@ -86,36 +116,48 @@
     aria-live="assertive"
   >
 
-    <span class="error-banner__icon">⚠</span>
+    <div class="error-banner__content">
 
-    <span
-      class="error-banner__text"
-      id="errorBannerText"
-    >
-      Some backend information may be unavailable.
-    </span>
+      <span
+        class="error-banner__icon"
+        aria-hidden="true"
+      >
+        !
+      </span>
+
+      <div>
+        <strong id="errorBannerTitle">
+          Backend unavailable
+        </strong>
+
+        <span id="errorBannerText">
+          Some transaction intelligence may be unavailable.
+        </span>
+      </div>
+
+    </div>
 
     <button
       class="error-banner__retry"
       id="errorBannerRetry"
       type="button"
     >
-      Retry
+      Retry connection
     </button>
 
   </div>
 
 
-  <!-- ========================================================
-       MAIN APPLICATION
-       ======================================================== -->
+  <!-- ======================================================
+       APPLICATION
+       ====================================================== -->
 
   <main id="app">
 
 
-    <!-- ======================================================
+    <!-- ====================================================
          ACCOUNTS VIEW
-         ====================================================== -->
+         ==================================================== -->
 
     <section
       id="view-accounts"
@@ -123,8 +165,6 @@
       role="tabpanel"
       aria-labelledby="accountsTab"
     >
-
-      <!-- PAGE HEADING -->
 
       <div class="page-heading">
 
@@ -139,28 +179,37 @@
           </h1>
 
           <p class="view-subtitle">
-            Explore accounts and investigate how money moves
-            between them.
+            Explore accounts, inspect transaction neighborhoods,
+            and identify unusual money movement.
           </p>
 
+        </div>
+
+        <div class="page-context">
+          <span class="context-dot"></span>
+          Live analysis
         </div>
 
       </div>
 
 
-      <!-- ====================================================
-           OVERVIEW STATISTICS
-           ==================================================== -->
+      <!-- ==================================================
+           OVERVIEW
+           ================================================== -->
 
       <div class="stats-grid">
 
-        <!-- ACCOUNTS -->
+        <article class="stat-card">
 
-        <div class="stat-card">
+          <div class="stat-card__top">
+            <span class="stat-label">
+              Accounts monitored
+            </span>
 
-          <span class="stat-label">
-            Accounts monitored
-          </span>
+            <span class="stat-icon">
+              AC
+            </span>
+          </div>
 
           <strong
             class="stat-value"
@@ -169,16 +218,24 @@
             —
           </strong>
 
-        </div>
-
-
-        <!-- TRANSACTIONS -->
-
-        <div class="stat-card">
-
-          <span class="stat-label">
-            Transactions analyzed
+          <span class="stat-footnote">
+            Accounts in detection scope
           </span>
+
+        </article>
+
+
+        <article class="stat-card">
+
+          <div class="stat-card__top">
+            <span class="stat-label">
+              Transactions analyzed
+            </span>
+
+            <span class="stat-icon">
+              TX
+            </span>
+          </div>
 
           <strong
             class="stat-value"
@@ -187,16 +244,24 @@
             —
           </strong>
 
-        </div>
-
-
-        <!-- SUSPICIOUS PATTERNS -->
-
-        <div class="stat-card">
-
-          <span class="stat-label">
-            Suspicious patterns
+          <span class="stat-footnote">
+            Transactions processed
           </span>
+
+        </article>
+
+
+        <article class="stat-card stat-card--danger">
+
+          <div class="stat-card__top">
+            <span class="stat-label">
+              Suspicious patterns
+            </span>
+
+            <span class="stat-icon stat-icon--danger">
+              !
+            </span>
+          </div>
 
           <strong
             class="stat-value stat-value--flag"
@@ -205,16 +270,24 @@
             —
           </strong>
 
-        </div>
-
-
-        <!-- TRANSACTION RINGS -->
-
-        <div class="stat-card">
-
-          <span class="stat-label">
-            Transaction rings
+          <span class="stat-footnote">
+            Patterns requiring review
           </span>
+
+        </article>
+
+
+        <article class="stat-card">
+
+          <div class="stat-card__top">
+            <span class="stat-label">
+              Transaction rings
+            </span>
+
+            <span class="stat-icon">
+              RG
+            </span>
+          </div>
 
           <strong
             class="stat-value"
@@ -223,21 +296,22 @@
             —
           </strong>
 
-        </div>
+          <span class="stat-footnote">
+            Circular transaction structures
+          </span>
+
+        </article>
 
       </div>
 
 
-      <!-- ====================================================
+      <!-- ==================================================
            ACCOUNT WORKSPACE
-           ==================================================== -->
+           ================================================== -->
 
-      <div class="workspace panel">
+      <section class="workspace panel">
 
-
-        <!-- ==================================================
-             ACCOUNT LIST
-             ================================================== -->
+        <!-- ACCOUNT LIST -->
 
         <div
           id="accountsListState"
@@ -248,32 +322,54 @@
 
             <div class="panel__heading">
 
-              <h2>
-                Accounts
-              </h2>
+              <div class="panel-title-row">
 
-              <span
-                id="accountsResultCount"
-                class="result-count"
-                aria-live="polite"
-              ></span>
+                <h2>
+                  Accounts
+                </h2>
+
+                <span
+                  id="accountsResultCount"
+                  class="result-count"
+                  aria-live="polite"
+                ></span>
+
+              </div>
+
+              <p class="panel__hint">
+                Select an account to inspect incoming and outgoing
+                transaction activity.
+              </p>
 
             </div>
 
 
-            <input
-              id="accountSearch"
-              class="search-input"
-              type="search"
-              placeholder="Search ID or name…"
-              autocomplete="off"
-              aria-label="Search accounts by ID or name"
-            >
+            <div class="search-wrapper">
+
+              <span
+                class="search-icon"
+                aria-hidden="true"
+              >
+                /
+              </span>
+
+              <input
+                id="accountSearch"
+                class="search-input"
+                type="search"
+                placeholder="Search account or name"
+                autocomplete="off"
+                aria-label="Search accounts by ID or name"
+              >
+
+              <kbd>
+                /
+              </kbd>
+
+            </div>
 
           </div>
 
-
-          <!-- ACCOUNT TABLE -->
 
           <div class="table-wrap">
 
@@ -283,7 +379,7 @@
 
                 <tr>
                   <th scope="col">Account</th>
-                  <th scope="col">Name</th>
+                  <th scope="col">Owner</th>
                   <th scope="col">Type</th>
                   <th scope="col">Activity</th>
                 </tr>
@@ -291,7 +387,6 @@
               </thead>
 
               <tbody id="accountsTableBody">
-                <!-- Filled by app.js -->
               </tbody>
 
             </table>
@@ -301,9 +396,7 @@
         </div>
 
 
-        <!-- ==================================================
-             ACCOUNT DETAIL
-             ================================================== -->
+        <!-- ACCOUNT DETAIL -->
 
         <div
           id="accountDetailState"
@@ -319,7 +412,8 @@
                 class="back-btn"
                 type="button"
               >
-                ← Accounts
+                <span aria-hidden="true">←</span>
+                Back to accounts
               </button>
 
               <span class="detail-label">
@@ -334,20 +428,18 @@
           <div
             id="accountDetailContent"
             class="account-detail-content"
-          >
-            <!-- Filled by app.js -->
-          </div>
+          ></div>
 
         </div>
 
-      </div>
+      </section>
 
     </section>
 
 
-    <!-- ======================================================
+    <!-- ====================================================
          DETECTIONS VIEW
-         ====================================================== -->
+         ==================================================== -->
 
     <section
       id="view-detections"
@@ -355,8 +447,6 @@
       role="tabpanel"
       aria-labelledby="detectionsTab"
     >
-
-      <!-- PAGE HEADING -->
 
       <div class="page-heading">
 
@@ -371,30 +461,33 @@
           </h1>
 
           <p class="view-subtitle">
-            Automatically detected money-movement patterns that
-            may require investigation.
+            Automated detection of circular, one-to-many,
+            and many-to-one money movement.
           </p>
 
+        </div>
+
+        <div class="page-context">
+          <span class="context-dot"></span>
+          Detection engine active
         </div>
 
       </div>
 
 
-      <!-- ====================================================
-           DETECTION CATEGORY SUMMARY
-           ==================================================== -->
+      <!-- ==================================================
+           DETECTION SUMMARY
+           ================================================== -->
 
       <div class="category-chips">
 
-
-        <!-- CYCLES -->
-
         <button
-          class="category-chip"
+          class="category-chip category-chip--cycle"
           data-jump="cyclesPanel"
           type="button"
-          aria-label="Jump to cycle detections"
         >
+
+          <span class="category-chip__indicator"></span>
 
           <span class="category-chip__label">
             Cycles
@@ -407,17 +500,20 @@
             —
           </strong>
 
+          <span class="category-chip__arrow">
+            →
+          </span>
+
         </button>
 
 
-        <!-- FAN-OUTS -->
-
         <button
-          class="category-chip"
+          class="category-chip category-chip--fanout"
           data-jump="fanoutPanel"
           type="button"
-          aria-label="Jump to fan-out detections"
         >
+
+          <span class="category-chip__indicator"></span>
 
           <span class="category-chip__label">
             Fan-outs
@@ -430,17 +526,20 @@
             —
           </strong>
 
+          <span class="category-chip__arrow">
+            →
+          </span>
+
         </button>
 
 
-        <!-- CONVERGENCE -->
-
         <button
-          class="category-chip"
+          class="category-chip category-chip--convergence"
           data-jump="convergencePanel"
           type="button"
-          aria-label="Jump to convergence detections"
         >
+
+          <span class="category-chip__indicator"></span>
 
           <span class="category-chip__label">
             Convergence
@@ -453,23 +552,25 @@
             —
           </strong>
 
+          <span class="category-chip__arrow">
+            →
+          </span>
+
         </button>
 
       </div>
 
 
-      <!-- ====================================================
+      <!-- ==================================================
            DETECTION PANELS
-           ==================================================== -->
+           ================================================== -->
 
       <div class="detections-grid">
 
 
-        <!-- ==================================================
-             CYCLES
-             ================================================== -->
+        <!-- CYCLES -->
 
-        <div
+        <section
           class="panel detection-panel"
           id="cyclesPanel"
         >
@@ -491,8 +592,8 @@
               </div>
 
               <p class="panel__hint">
-                Money that loops back to where it started.
-                For example: A pays B, B pays C, and C pays A.
+                Funds move through a chain of accounts and
+                eventually return to the origin.
               </p>
 
             </div>
@@ -504,18 +605,14 @@
             id="cyclesList"
             class="scroll-panel"
             aria-live="polite"
-          >
-            <!-- Filled by app.js -->
-          </div>
+          ></div>
 
-        </div>
+        </section>
 
 
-        <!-- ==================================================
-             FAN-OUT
-             ================================================== -->
+        <!-- FAN OUT -->
 
-        <div
+        <section
           class="panel detection-panel"
           id="fanoutPanel"
         >
@@ -537,8 +634,8 @@
               </div>
 
               <p class="panel__hint">
-                One account sends money to multiple accounts
-                within a short window.
+                A single source distributes funds to multiple
+                destination accounts within a short window.
               </p>
 
             </div>
@@ -550,18 +647,14 @@
             id="fanoutList"
             class="scroll-panel"
             aria-live="polite"
-          >
-            <!-- Filled by app.js -->
-          </div>
+          ></div>
 
-        </div>
+        </section>
 
 
-        <!-- ==================================================
-             CONVERGENCE
-             ================================================== -->
+        <!-- CONVERGENCE -->
 
-        <div
+        <section
           class="panel detection-panel"
           id="convergencePanel"
         >
@@ -583,8 +676,8 @@
               </div>
 
               <p class="panel__hint">
-                Multiple accounts send money into one destination,
-                the reverse of a fan-out.
+                Multiple source accounts funnel funds into
+                a single destination account.
               </p>
 
             </div>
@@ -596,12 +689,9 @@
             id="convergenceList"
             class="scroll-panel"
             aria-live="polite"
-          >
-            <!-- Filled by app.js -->
-          </div>
+          ></div>
 
-        </div>
-
+        </section>
 
       </div>
 
@@ -609,10 +699,6 @@
 
   </main>
 
-
-  <!-- ========================================================
-       JAVASCRIPT
-       ======================================================== -->
 
   <script src="app.js"></script>
 
