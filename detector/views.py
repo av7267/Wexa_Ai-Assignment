@@ -28,8 +28,8 @@ def _serialize_account(row):
             if created_at
             else None
         ),
+        "transaction_count": row.get("transaction_count", 0),
     }
-
 
 def _serialize_tx(entry):
     ts = entry.get("timestamp")

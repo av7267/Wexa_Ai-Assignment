@@ -740,6 +740,31 @@ The backend and graph-analysis components have been implemented and verified aga
 
 ---
 
+
+### CognoDB Running Instance
+
+![CognoDB Running Instance](docs/cognodb-instance.png)
+
+### Graph Data
+
+![Graph Data](docs/graph-data.png)
+
+### Account Explorer
+
+![Account Explorer](docs/account-explorer.png)
+
+### Transaction Detail
+
+![Transaction Detail](docs/transaction-detail.png)
+
+### Cycle Detection
+
+![Cycle Detection](docs/cycle-detection.png)
+
+### API Evidence
+
+![API Evidence](docs/api-evidence.png)
+
 ## Author
 
 **Arnav**

@@ -44,76 +44,102 @@ RETURN count(tx) AS transaction_count
 #
 # ============================================================
 CYCLE_DETECTION_QUERY = """
-MATCH p = (start:Account)-[:TRANSFERRED*3..6]->(start)
+// ============================================================
+// 3-hop cycles
+// ============================================================
 
-WITH
-    start,
-    nodes(p)[0..-1] AS cycle_nodes,
-    length(p) AS hop_count
-
-WHERE
-    // Only 3-6 hop cycles.
-    hop_count >= 3
-    AND hop_count <= 6
-
-    // Canonical cycle:
-    // smallest account ID must be the starting account.
-    AND start.id = reduce(
-        smallest = start.id,
-        node IN cycle_nodes |
-        CASE
-            WHEN node.id < smallest
-            THEN node.id
-            ELSE smallest
-        END
-    )
-
-UNWIND cycle_nodes AS node
-
-WITH
-    start,
-    cycle_nodes,
-    hop_count,
-    collect(DISTINCT node.id) AS distinct_ids
-
-// Reject cycles where an account occurs more than once.
-WHERE size(cycle_nodes) = size(distinct_ids)
-
-WITH
-    [node IN cycle_nodes | node.id] AS account_sequence,
-    hop_count
-
-RETURN DISTINCT
-    account_sequence,
-    hop_count
-
-ORDER BY hop_count, account_sequence
-"""
-
-# ============================================================
-# THREE-HOP CYCLE DETECTION
-# ============================================================
-
-THREE_HOP_CYCLE_QUERY = """
 MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
       -[:TRANSFERRED]->(c:Account)
       -[:TRANSFERRED]->(a)
 
-WHERE
-    a <> b
-    AND a <> c
-    AND b <> c
-    AND a.id < b.id
-    AND a.id < c.id
+WHERE a.id < b.id
+  AND a.id < c.id
+  AND b.id <> c.id
 
-RETURN DISTINCT
-    [a.id, b.id, c.id] AS account_sequence,
-    3 AS hop_count
+RETURN [a.id, b.id, c.id] AS account_sequence,
+       3 AS hop_count
 
-ORDER BY account_sequence
+UNION
+
+// ============================================================
+// 4-hop cycles
+// ============================================================
+
+MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
+      -[:TRANSFERRED]->(c:Account)
+      -[:TRANSFERRED]->(d:Account)
+      -[:TRANSFERRED]->(a)
+
+WHERE a.id < b.id
+  AND a.id < c.id
+  AND a.id < d.id
+  AND b.id <> c.id
+  AND b.id <> d.id
+  AND c.id <> d.id
+
+RETURN [a.id, b.id, c.id, d.id] AS account_sequence,
+       4 AS hop_count
+
+UNION
+
+// ============================================================
+// 5-hop cycles
+// ============================================================
+
+MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
+      -[:TRANSFERRED]->(c:Account)
+      -[:TRANSFERRED]->(d:Account)
+      -[:TRANSFERRED]->(e:Account)
+      -[:TRANSFERRED]->(a)
+
+WHERE a.id < b.id
+  AND a.id < c.id
+  AND a.id < d.id
+  AND a.id < e.id
+  AND b.id <> c.id
+  AND b.id <> d.id
+  AND b.id <> e.id
+  AND c.id <> d.id
+  AND c.id <> e.id
+  AND d.id <> e.id
+
+RETURN [a.id, b.id, c.id, d.id, e.id] AS account_sequence,
+       5 AS hop_count
+
+UNION
+
+// ============================================================
+// 6-hop cycles
+// ============================================================
+
+MATCH (a:Account)-[:TRANSFERRED]->(b:Account)
+      -[:TRANSFERRED]->(c:Account)
+      -[:TRANSFERRED]->(d:Account)
+      -[:TRANSFERRED]->(e:Account)
+      -[:TRANSFERRED]->(f:Account)
+      -[:TRANSFERRED]->(a)
+
+WHERE a.id < b.id
+  AND a.id < c.id
+  AND a.id < d.id
+  AND a.id < e.id
+  AND a.id < f.id
+  AND b.id <> c.id
+  AND b.id <> d.id
+  AND b.id <> e.id
+  AND b.id <> f.id
+  AND c.id <> d.id
+  AND c.id <> e.id
+  AND c.id <> f.id
+  AND d.id <> e.id
+  AND d.id <> f.id
+  AND e.id <> f.id
+
+RETURN [a.id, b.id, c.id, d.id, e.id, f.id] AS account_sequence,
+       6 AS hop_count
+
+ORDER BY hop_count, account_sequence
 """
-
-
 # ============================================================
 # FAN-OUT DETECTION
 # ============================================================
