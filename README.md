@@ -363,34 +363,41 @@ The UI also handles:
 
 ## Project Structure
 
-```
-transaction-graph/
+```text
+Wexa_Ai-Assignment/
 │
 ├── backend/
-│   ├── manage.py
-│   │
-│   ├── config/
-│   │
-│   └── detector/
-│       ├── views.py
-│       ├── urls.py
-│       ├── db.py
-│       └── queries.py
+│   ├── asgi.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
 │
-├── scripts/
-│   └── seed.py
+├── detector/
+│   ├── convergence.py
+│   ├── cycles.py
+│   ├── db.py
+│   ├── fanout.py
+│   ├── queries.py
+│   ├── urls.py
+│   └── views.py
 │
-├── frontend/
+├── Frontend/
 │   ├── index.html
 │   ├── app.js
-│   └── styles.css
+│   └── style.css
+│
+├── scripts/
+│   ├── planted_patterns.json
+│   └── seed.py
 │
 ├── docs/
-│   └── graph-model.png
+│   └── *.png
 │
+├── test_*.py
+├── manage.py
+├── requirements.txt
 ├── .env.example
 ├── .gitignore
-├── requirements.txt
 └── README.md
 ```
 
