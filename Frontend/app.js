@@ -4,7 +4,7 @@
 
 const API_BASE = (window.BACKEND_URL || "http://127.0.0.1:8000") + "/api";
 
-const REQUEST_TIMEOUT = 10000;
+const REQUEST_TIMEOUT = 30000;
 
 const state = {
   accounts: [],
