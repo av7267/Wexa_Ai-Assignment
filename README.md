@@ -171,7 +171,7 @@ This design treats the transfer itself as a relationship because the direction a
 The repository contains a visual graph-model diagram at:
 
 ```
-docs/graph-model.png
+docs/graph-data.png
 ```
 
 The diagram documents Account nodes, TRANSFERRED relationships, transfer properties, and the direction of money movement.
