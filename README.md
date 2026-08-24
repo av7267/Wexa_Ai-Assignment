@@ -1,5 +1,9 @@
 # Wexa_Ai-Assignment — Transaction Graph Anomaly Detector
 
+> **Live Hosted Demo (Vercel):** [https://wexa-ai-assignment-pi.vercel.app](https://wexa-ai-assignment-pi.vercel.app)  
+> **Backend REST API (Render):** [https://wexa-fraud-detector-api.onrender.com](https://wexa-fraud-detector-api.onrender.com)  
+> **Screen Recording Demo:** [View Screen Recording](https://drive.google.com/file/d/1EydRNceCx0i7OnuuxyW_2N_2GwdUYvJJ/view?usp=sharing)
+
 A graph-based transaction anomaly detection application built with Django REST Framework, the Neo4j Python Driver, and CognoDB.
 
 The application models financial accounts and money transfers as a graph and detects suspicious transaction structures such as multi-hop rings, fan-out patterns, and convergence patterns.
@@ -585,14 +589,13 @@ docs/
 ---
 
 ## Demo
+- **Live Hosted Demo (Vercel):** [https://wexa-ai-assignment-pi.vercel.app](https://wexa-ai-assignment-pi.vercel.app)
+- **Live Backend API (Render):** [https://wexa-fraud-detector-api.onrender.com](https://wexa-fraud-detector-api.onrender.com)
+- **Screen Recording (Google Drive):** [View the screen recording](https://drive.google.com/file/d/1EydRNceCx0i7OnuuxyW_2N_2GwdUYvJJ/view?usp=sharing)
 
-The application runs locally rather than as a hosted deployment. A screen recording demonstrates the full working application end-to-end:
+The screen recording demonstrates the full working application end-to-end:
 
-**Screen Recording:** [View the screen recording](https://drive.google.com/file/d/1EydRNceCx0i7OnuuxyW_2N_2GwdUYvJJ/view?usp=sharing)
-
-The recording covers:
-
-1. Opening the application locally
+1. Opening the application
 2. Searching/selecting an account
 3. Viewing its transaction graph
 4. Running/viewing suspicious-pattern detection
