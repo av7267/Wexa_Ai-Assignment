@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: wexa-fraud-detector-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2
+    envVars:
+      - key: DEBUG
+        value: False
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        sync: false   # Set in Render dashboard: your-app.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false   # Set in Render dashboard: https://your-app.vercel.app
+      - key: COGNODB_URI
+        sync: false
+      - key: COGNODB_USERNAME
+        sync: false
+      - key: COGNODB_PASSWORD
+        sync: false
