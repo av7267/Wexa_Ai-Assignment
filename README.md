@@ -581,7 +581,7 @@ docs/
 
 The application runs locally rather than as a hosted deployment. A screen recording demonstrates the full working application end-to-end:
 
-**Screen Recording:** [View the screen recording](https://drive.google.com/file/d/1nhkt5UE9vTgqWKktab70k1wa3mykfQge/view?usp=sharing)
+**Screen Recording:** [View the screen recording](https://drive.google.com/file/d/1EydRNceCx0i7OnuuxyW_2N_2GwdUYvJJ/view?usp=sharing)
 
 The recording covers:
 
